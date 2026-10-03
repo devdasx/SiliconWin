@@ -1,0 +1,72 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please search the [existing issues](https://github.com/devdasx/SiliconWin/issues) and the [troubleshooting guide](https://github.com/devdasx/SiliconWin/blob/main/docs/TROUBLESHOOTING.md) first.
+
+        **Security vulnerabilities:** please don't use this form. Report them privately as described in [SECURITY.md](https://github.com/devdasx/SiliconWin/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected to happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a Windows 11 on Arm VM with automatic setup
+        2. Start it and wait for the desktop
+        3. Drag a folder onto the screen
+        4. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: guest
+    attributes:
+      label: Windows edition
+      options:
+        - Windows 11 on Arm
+        - Windows 11 (x64, emulated)
+        - Windows 10 (x64, emulated)
+        - Not specific to a VM (building, app UI, ...)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: SiliconWin version or commit
+      placeholder: v1.0.0 or a1b2c3d
+    validations:
+      required: true
+
+  - type: input
+    id: mac
+    attributes:
+      label: macOS version and Mac model
+      placeholder: macOS 27.0 on a MacBook Pro (M3 Pro, 18 GB)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Relevant parts of `<VM>.winvm/Logs/qemu.log`. If the problem is inside Windows, also include the guest tools logs (see the troubleshooting guide). Remove any personal information first.
+      render: text
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Screenshots, workarounds you found, or anything else that might help.

@@ -1,0 +1,35 @@
+SiliconWin: refresh the display at 60 fps
+
+QEMU refreshes graphical consoles every 30 ms (about 33 fps), and the VNC
+server backs off to one update every 3 s while the screen is idle, which makes
+the pointer feel sluggish after a pause. Refresh every 16 ms instead, and never
+back off beyond 100 ms. SiliconWin talks to the VNC server over a local Unix
+socket, so the extra updates cost very little.
+
+License: same as the files it modifies (include/ui/console.h: GPL-2.0-or-later,
+ui/vnc.c: MIT).
+
+--- a/include/ui/console.h	2026-10-03 04:51:59
++++ b/include/ui/console.h	2026-10-03 04:51:59
+@@ -36,7 +36,7 @@
+ #define QEMU_CAPS_LOCK_LED   (1 << 2)
+ 
+ /* in ms */
+-#define GUI_REFRESH_INTERVAL_DEFAULT    30
++#define GUI_REFRESH_INTERVAL_DEFAULT    16  /* SiliconWin: 60 fps instead of ~33 */
+ #define GUI_REFRESH_INTERVAL_IDLE     3000
+ 
+ /* Color number is match to standard vga palette */
+--- a/ui/vnc.c	2026-10-03 04:51:59
++++ b/ui/vnc.c	2026-10-03 04:51:59
+@@ -59,8 +59,8 @@
+ #include "monitor/monitor.h"
+ 
+ #define VNC_REFRESH_INTERVAL_BASE GUI_REFRESH_INTERVAL_DEFAULT
+-#define VNC_REFRESH_INTERVAL_INC  50
+-#define VNC_REFRESH_INTERVAL_MAX  GUI_REFRESH_INTERVAL_IDLE
++#define VNC_REFRESH_INTERVAL_INC  16   /* SiliconWin: stay responsive when idle */
++#define VNC_REFRESH_INTERVAL_MAX  100  /* SiliconWin: was GUI_REFRESH_INTERVAL_IDLE (3 s) */
+ static const struct timeval VNC_REFRESH_STATS = { 0, 500000 };
+ static const struct timeval VNC_REFRESH_LOSSY = { 2, 0 };
+ 

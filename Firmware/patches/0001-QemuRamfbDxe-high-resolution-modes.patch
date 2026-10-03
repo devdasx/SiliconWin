@@ -1,0 +1,244 @@
+SiliconWin: OvmfPkg/QemuRamfbDxe: high-resolution display modes
+
+The stock driver offers 640x480, 800x600 and 1024x768 only. Offer 18 Graphics
+Output Protocol modes up to 3840x2160, plus a custom mode (up to 5120x2880)
+read from the fw_cfg file "opt/siliconwin/resolution" ("<width>x<height>").
+The requested mode becomes the default, and PcdVideoHorizontalResolution and
+PcdVideoVerticalResolution are set so the console and the OS loader keep it.
+Windows on Arm has no ramfb driver and keeps the mode the firmware sets.
+
+The full modified files are in Firmware/src; Scripts/build-firmware.sh copies
+them into the edk2 tree. This patch shows the change against the edk2 sources
+in QEMU 11.1.2 (roms/edk2). It uses LF line endings while edk2 uses CRLF, so
+apply it with "git apply --ignore-whitespace" or convert the files first.
+
+License: BSD-2-Clause-Patent, like the files it modifies.
+
+--- a/OvmfPkg/QemuRamfbDxe/QemuRamfb.c
++++ b/OvmfPkg/QemuRamfbDxe/QemuRamfb.c
+@@ -16,6 +16,7 @@
+ #include <Library/DevicePathLib.h>
+ #include <Library/FrameBufferBltLib.h>
+ #include <Library/MemoryAllocationLib.h>
++#include <Library/PcdLib.h>
+ #include <Library/UefiBootServicesTableLib.h>
+ #include <Library/QemuFwCfgLib.h>
+ 
+@@ -41,29 +42,149 @@
+ STATIC UINTN                   mQemuRamfbFrameBufferBltConfigureSize;
+ STATIC FIRMWARE_CONFIG_ITEM    mRamfbFwCfgItem;
+ 
+-STATIC EFI_GRAPHICS_OUTPUT_MODE_INFORMATION  mQemuRamfbModeInfo[] = {
+-  {
+-    0,    // Version
+-    640,  // HorizontalResolution
+-    480,  // VerticalResolution
+-  },{
+-    0,    // Version
+-    800,  // HorizontalResolution
+-    600,  // VerticalResolution
+-  },{
+-    0,    // Version
+-    1024, // HorizontalResolution
+-    768,  // VerticalResolution
+-  }
++//
++// SiliconWin: the stock driver only offers 640x480, 800x600 and 1024x768.
++// Windows on Arm has no ramfb driver of its own and keeps whatever GOP mode
++// the firmware picked, so offer the usual desktop/laptop resolutions as well.
++// One extra slot at the end holds a custom resolution requested by the host
++// through the "opt/siliconwin/resolution" fw_cfg file (e.g. "1920x1080").
++//
++#define RAMFB_PREFERRED_FWCFG_FILE  "opt/siliconwin/resolution"
++#define RAMFB_DEFAULT_MODE          1          // 800 x 600, as before
++#define RAMFB_MAX_WIDTH             5120
++#define RAMFB_MAX_HEIGHT            2880
++#define RAMFB_STANDARD_MODE_COUNT   18
++
++STATIC EFI_GRAPHICS_OUTPUT_MODE_INFORMATION  mQemuRamfbModeInfo[RAMFB_STANDARD_MODE_COUNT + 1] = {
++  { 0, 640,  480  },
++  { 0, 800,  600  },
++  { 0, 1024, 768  },
++  { 0, 1280, 720  },
++  { 0, 1280, 800  },
++  { 0, 1280, 1024 },
++  { 0, 1366, 768  },
++  { 0, 1440, 900  },
++  { 0, 1600, 900  },
++  { 0, 1600, 1200 },
++  { 0, 1680, 1050 },
++  { 0, 1920, 1080 },
++  { 0, 1920, 1200 },
++  { 0, 2048, 1152 },
++  { 0, 2560, 1440 },
++  { 0, 2560, 1600 },
++  { 0, 2880, 1800 },
++  { 0, 3840, 2160 },
++  { 0, 0,    0    }   // custom resolution from the host, if any
+ };
+ 
+ STATIC EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE  mQemuRamfbMode = {
+-  ARRAY_SIZE (mQemuRamfbModeInfo),                // MaxMode
++  RAMFB_STANDARD_MODE_COUNT,                      // MaxMode
+   0,                                              // Mode
+   mQemuRamfbModeInfo,                             // Info
+   sizeof (EFI_GRAPHICS_OUTPUT_MODE_INFORMATION),  // SizeOfInfo
+ };
++
++/**
++  Parse "<width>x<height>" (decimal) into its two numbers.
++
++  @retval TRUE   The string held a resolution within the supported limits.
++**/
++STATIC
++BOOLEAN
++QemuRamfbParseResolution (
++  IN  CONST CHAR8  *String,
++  OUT UINT32       *Width,
++  OUT UINT32       *Height
++  )
++{
++  UINT32  Value[2];
++  UINTN   Part;
++
++  Value[0] = 0;
++  Value[1] = 0;
++  Part     = 0;
++
++  for ( ; *String != '\0'; String++) {
++    if ((*String >= '0') && (*String <= '9')) {
++      if (Value[Part] > 100000) {
++        return FALSE;
++      }
++
++      Value[Part] = Value[Part] * 10 + (UINT32)(*String - '0');
++    } else if (((*String == 'x') || (*String == 'X')) && (Part == 0)) {
++      Part = 1;
++    } else if ((*String == '\n') || (*String == '\r') || (*String == ' ')) {
++      break;
++    } else {
++      return FALSE;
++    }
++  }
++
++  if ((Part != 1) || (Value[0] < 640) || (Value[1] < 480) ||
++      (Value[0] > RAMFB_MAX_WIDTH) || (Value[1] > RAMFB_MAX_HEIGHT))
++  {
++    return FALSE;
++  }
++
++  *Width  = Value[0];
++  *Height = Value[1];
++  return TRUE;
++}
++
++/**
++  Return the GOP mode to start in: the resolution requested by the host via
++  fw_cfg (added as a custom mode when it is not a standard one), or the
++  historical 800x600 default.
++**/
++STATIC
++UINT32
++QemuRamfbPreferredMode (
++  VOID
++  )
++{
++  FIRMWARE_CONFIG_ITEM  Item;
++  UINTN                 Size;
++  CHAR8                 Buffer[32];
++  UINT32                Width;
++  UINT32                Height;
++  UINT32                Index;
++
++  if (EFI_ERROR (QemuFwCfgFindFile (RAMFB_PREFERRED_FWCFG_FILE, &Item, &Size)) ||
++      (Size == 0) || (Size >= sizeof (Buffer)))
++  {
++    return RAMFB_DEFAULT_MODE;
++  }
++
++  QemuFwCfgSelectItem (Item);
++  QemuFwCfgReadBytes (Size, Buffer);
++  Buffer[Size] = '\0';
+ 
++  if (!QemuRamfbParseResolution (Buffer, &Width, &Height)) {
++    DEBUG ((DEBUG_ERROR, "Ramfb: ignoring invalid resolution \"%a\"\n", Buffer));
++    return RAMFB_DEFAULT_MODE;
++  }
++
++  //
++  // GraphicsConsoleDxe switches to PcdVideo*Resolution when it starts (and
++  // the OS loader inherits that mode), so make it pick the requested one.
++  //
++  (VOID)PcdSet32S (PcdVideoHorizontalResolution, Width);
++  (VOID)PcdSet32S (PcdVideoVerticalResolution, Height);
++
++  for (Index = 0; Index < RAMFB_STANDARD_MODE_COUNT; Index++) {
++    if ((mQemuRamfbModeInfo[Index].HorizontalResolution == Width) &&
++        (mQemuRamfbModeInfo[Index].VerticalResolution == Height))
++    {
++      return Index;
++    }
++  }
++
++  mQemuRamfbModeInfo[RAMFB_STANDARD_MODE_COUNT].HorizontalResolution = Width;
++  mQemuRamfbModeInfo[RAMFB_STANDARD_MODE_COUNT].VerticalResolution   = Height;
++  mQemuRamfbMode.MaxMode                                             = RAMFB_STANDARD_MODE_COUNT + 1;
++  return RAMFB_STANDARD_MODE_COUNT;
++}
++
+ STATIC
+ EFI_STATUS
+ EFIAPI
+@@ -251,6 +372,7 @@
+   UINTN                     FbSize, MaxFbSize, Pages;
+   UINTN                     FwCfgSize;
+   UINTN                     Index;
++  UINT32                    PreferredMode;
+ 
+   if (!QemuFwCfgIsAvailable ()) {
+     DEBUG ((DEBUG_INFO, "Ramfb: no FwCfg\n"));
+@@ -272,8 +394,10 @@
+     return EFI_PROTOCOL_ERROR;
+   }
+ 
++  PreferredMode = QemuRamfbPreferredMode ();
++
+   MaxFbSize = 0;
+-  for (Index = 0; Index < ARRAY_SIZE (mQemuRamfbModeInfo); Index++) {
++  for (Index = 0; Index < mQemuRamfbMode.MaxMode; Index++) {
+     mQemuRamfbModeInfo[Index].PixelsPerScanLine =
+       mQemuRamfbModeInfo[Index].HorizontalResolution;
+     mQemuRamfbModeInfo[Index].PixelFormat =
+@@ -314,9 +438,9 @@
+   mQemuRamfbMode.FrameBufferBase = FbBase;
+ 
+   //
+-  // 800 x 600
++  // Start in the resolution the host asked for (800 x 600 by default).
+   //
+-  QemuRamfbGraphicsOutputSetMode (&mQemuRamfbGraphicsOutput, 1);
++  QemuRamfbGraphicsOutputSetMode (&mQemuRamfbGraphicsOutput, PreferredMode);
+ 
+   //
+   // ramfb vendor devpath
+--- a/OvmfPkg/QemuRamfbDxe/QemuRamfbDxe.inf
++++ b/OvmfPkg/QemuRamfbDxe/QemuRamfbDxe.inf
+@@ -32,6 +32,7 @@
+   DevicePathLib
+   FrameBufferBltLib
+   MemoryAllocationLib
++  PcdLib
+   UefiBootServicesTableLib
+   UefiDriverEntryPoint
+   QemuFwCfgLib
+@@ -39,6 +40,10 @@
+ [Protocols]
+   gEfiGraphicsOutputProtocolGuid                ## PRODUCES
+ 
++[Pcd]
++  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution  ## SOMETIMES_PRODUCES
++  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution    ## SOMETIMES_PRODUCES
++
+ [Guids]
+   gQemuRamfbGuid
+ 

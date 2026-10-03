@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Build app (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Build (debug)
+        working-directory: App
+        run: swift build
+
+      - name: Build (release, arm64)
+        working-directory: App
+        run: swift build -c release --arch arm64
+
+  scripts:
+    name: Check scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Shell syntax
+        run: bash -n Scripts/*.sh
+
+      - name: ShellCheck
+        run: shellcheck -x Scripts/*.sh
+
+      - name: Python syntax
+        run: python3 -m py_compile Scripts/bundle-runtime.py
+
+      - name: Guest tools keep CRLF line endings
+        run: |
+          status=0
+          for file in App/Resources/GuestTools/*; do
+            if grep -q -v $'\r$' "$file"; then
+              echo "::error file=$file::$file must use CRLF line endings"
+              status=1
+            fi
+          done
+          exit $status

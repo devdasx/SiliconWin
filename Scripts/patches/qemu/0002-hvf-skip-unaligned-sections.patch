@@ -1,0 +1,28 @@
+SiliconWin: hvf: skip memory sections that are not page aligned
+
+Attaching a TPM (tpm-tis-device) under HVF crashes QEMU with HV_BAD_ARGUMENT
+on Apple silicon: the TPM's 1 KiB PPI buffer is not aligned to the host's
+16 KiB pages, so it was never mapped, yet QEMU still tried to unmap it. Leave
+such sections alone; they are handled as MMIO.
+
+License: GPL-2.0-or-later, like the file it modifies (accel/hvf/hvf-all.c).
+
+--- a/accel/hvf/hvf-all.c	2026-10-03 05:28:07
++++ b/accel/hvf/hvf-all.c	2026-10-03 05:28:07
+@@ -113,8 +113,14 @@
+ 
+     if (!QEMU_IS_ALIGNED(size, page_size) ||
+         !QEMU_IS_ALIGNED(gpa, page_size)) {
+-        /* Not page aligned, so we can not map as RAM */
+-        add = false;
++        /*
++         * Not page aligned, so we can not map as RAM. Such a section was never
++         * mapped either (e.g. the 1 KiB TPM PPI buffer on 16 KiB-page Apple
++         * silicon), so there is nothing to unmap: calling hv_vm_unmap() with
++         * unaligned arguments fails with HV_BAD_ARGUMENT and aborts QEMU.
++         * Guest accesses simply trap to QEMU instead. (SiliconWin patch)
++         */
++        return;
+     }
+ 
+     if (!add) {

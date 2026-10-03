@@ -1,0 +1,21 @@
+# Store text files with LF line endings.
+* text=auto eol=lf
+
+# Windows reads these files: keep CRLF line endings in the working tree.
+App/Resources/GuestTools/*.cmd text eol=crlf
+App/Resources/GuestTools/*.ps1 text eol=crlf
+App/Resources/GuestTools/*.txt text eol=crlf
+
+# edk2 sources use CRLF line endings.
+Firmware/src/*.c   text eol=crlf
+Firmware/src/*.inf text eol=crlf
+
+# Patches are applied byte for byte.
+*.patch -text
+
+# Binary files.
+*.png  binary
+*.icns binary
+
+# Language statistics on GitHub.
+docs/** linguist-documentation

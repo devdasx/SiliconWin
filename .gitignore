@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+._*
+
+# Swift Package Manager / Xcode
+App/.build/
+App/.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcodeproj/
+
+# Build output (see Scripts/env.sh: SILICONWIN_APP_DIR defaults to dist/)
+/dist/
+__pycache__/
+*.pyc
+
+# Machine-specific build settings
+Scripts/local.env
+
+# Never commit Windows installers, VM bundles, disk images or firmware builds
+*.iso
+*.winvm/
+*.img
+*.fd
+*.icns
+*.iconset/
