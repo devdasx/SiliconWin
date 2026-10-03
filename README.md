@@ -2,13 +2,13 @@
 
 <img src="docs/images/icon.png" width="128" height="128" alt="SiliconWin app icon">
 
-# SiliconWin
+# SiliconWin: Windows 11 on Apple Silicon Macs
 
-**Windows 11 on Apple silicon, in a native macOS app.**
+**Run Windows 11 on your M1, M2, M3, M4 or M5 Mac at near-native speed. Free, open source and fully automatic.**
 
-SiliconWin downloads, installs and runs Windows 11 on Arm in a virtual machine at near-native speed.<br>
+SiliconWin is a native macOS app that downloads, installs and runs Windows 11 on Arm in a virtual machine.<br>
 It uses Apple's Hypervisor framework with its own builds of QEMU, the UEFI firmware and a TPM 2.0 emulator.<br>
-Setup is fully automatic, from Microsoft's download page to the Windows desktop.
+It's a free, open-source alternative to Parallels Desktop, VMware Fusion and UTM for running Windows on a Mac.
 
 [![CI](https://github.com/devdasx/SiliconWin/actions/workflows/ci.yml/badge.svg)](https://github.com/devdasx/SiliconWin/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -25,7 +25,7 @@ Setup is fully automatic, from Microsoft's download page to the Windows desktop.
 [Building](docs/BUILDING.md) ·
 [FAQ](#faq)
 
-<img src="docs/images/wizard-1-windows.png" alt="Creating a Windows 11 on Arm virtual machine in SiliconWin" width="720">
+<img src="docs/images/wizard-1-windows.png" alt="SiliconWin: creating a Windows 11 on Arm virtual machine on an Apple Silicon Mac" width="720">
 
 </div>
 
@@ -272,4 +272,4 @@ Thank you to everyone who maintains them.
 
 ---
 
-<sub>Microsoft, Windows and Windows 11 are trademarks of the Microsoft group of companies. Apple, Mac, macOS and Apple silicon are trademarks of Apple Inc., registered in the U.S. and other countries. SiliconWin is an independent project and is not affiliated with, sponsored by or endorsed by Microsoft or Apple.</sub>
+<sub>Microsoft, Windows and Windows 11 are trademarks of the Microsoft group of companies. Apple, Mac, macOS and Apple silicon are trademarks of Apple Inc., registered in the U.S. and other countries. Parallels and VMware Fusion are trademarks of their respective owners. SiliconWin is an independent project and is not affiliated with, sponsored by or endorsed by Microsoft, Apple or any other company named here.</sub>
