@@ -1,13 +1,10 @@
+# Version updates paused at the repository owner's request.
 version: 2
-updates: []
-
-# Dependabot version-update schedules paused at the repository owner's request.
-# Original configuration retained below for easy restoration:
-# version: 2
-# updates:
-#   - package-ecosystem: github-actions
-#     directory: /
-#     schedule:
-#       interval: monthly
-#     commit-message:
-#       prefix: "CI"
+updates:
+  - package-ecosystem: github-actions
+    open-pull-requests-limit: 0
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "CI"
